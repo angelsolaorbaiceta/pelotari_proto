@@ -91,3 +91,49 @@ When the original broadcaster receives a response, here's what it does:
 The message should contain the string: `dale!`.
 
 
+## 2 Heartbeat
+
+A heartbeat is a message sent by a computer to those peers from whom it hasn't heard any messages for a configurable amount of time (inactive peer time).
+Each peer has a _last seen_ timestamp with the time when the last message from it was received.
+These timestamps are used to calculate when a peer hasn't been seen for some time.
+Aditionally, each peer has a "missed heartbeats" counter.
+When this counter reaches 3 missed heartbeats, the peer is considered disconnected, and hence removed from the registered peers list.
+
+The heartbeat works as follows:
+
+1. The broadcaster loops through its registered peers.
+2. For each peer whose "last seen" timestamp is farther in the past than the inactive peer time, send a hearbeat message.
+Heartbeat messages are unicast UDP messages containing the string `hor?` (there?).
+3. The broadcaster waits for a maximum amount of configurable time (heartbeat max wait time).
+4. If the peer answers with a `hemen nago!` message (I'm here), the "last seen" timestamp is updated, the missed heartbeats counter reset to zero, and the remaining steps skipped.
+5. If the broadcaster doesn't receive response during the allowed time window, its missed heartbeats counter is incremented.
+6. If the missed heartbeats reaches 3, the peer is removed from the registered peers.
+
+Here's a simplified diagram of the process:
+
+```
++-----------------+     Heartbeat (port 21450)            +-----------------+
+|   Broadcaster   |-------------------------------------->|     Peer X      |
++-----------------+               [hor?]                  +-----------------+
+        |                                                         |
+        | Wait for response                                       |
+        |                      Response (port 21450)              |
+        |<--------------------------------------------------------+
+        |                         [hemen nago!]
+        | No Response
+        |
+        V
++------------------+
+|   Broadcaster    |
+| Increment missed |
+| heartbeats       |
++------------------+
+```
+
+
+## Configuration
+
+- **Max. peers**--The maximum number of peers the protocol will attempt to register.
+- **Broadcast interval**--The amount of time to wait between broadcast messages (defaults to 5 seconds).
+- **Inactive peer time**--The amount of time after which, if a peer hasn't sent any message, a heartbeat is sent.
+- **Heartbeat max. wait time**--The maximum amount of time the broadcaster waits for the heartbeat response (defaults to 1 second).
