@@ -91,7 +91,7 @@ When the original broadcaster receives a response, here's what it does:
 The message should contain the string: `dale!`.
 
 
-## 2 Heartbeat
+## 2. Heartbeat
 
 A heartbeat is a message sent by a computer to those peers from whom it hasn't heard any messages for a configurable amount of time (inactive peer time).
 Each peer has a _last seen_ timestamp with the time when the last message from it was received.
@@ -129,6 +129,28 @@ Here's a simplified diagram of the process:
 | heartbeats       |
 +------------------+
 ```
+
+
+## 3. Delivery
+
+A peer can send messages to any of its registered peers.
+Messages are "fire and forget," that is, there isn't any acknowledgement mechanism or retries.
+
+A peer should only accept messages from its known peers.
+If a message is received and it doesn't match any of the peers it has registered, it should ignore it.
+This prevents external agents that haven't gone through the handshake procedure to interfere with the communication.
+
+Messages are sent as UDP packages to the 21450 port.
+
+
+## 3. Disconnect
+
+When a peer wishes to disconnect, it should send a `agur!` UDP message to each of its registered peers, at port 21450.
+No answer is expected from the peers--as soon as all messages have been sent, the peer is free to disconnect.
+For those peers that have missed the disconnect message (UDP doesn't guarantee delivery), the heartbeat procedure should handle the clean up.
+
+When a peer receives an `agur!` message from a registered peer, it should immediately remove it from the list.
+Messages from unknown peers are ignored.
 
 
 ## Configuration
