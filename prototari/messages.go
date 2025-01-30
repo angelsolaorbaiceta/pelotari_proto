@@ -1,5 +1,6 @@
 package prototari
 
 const (
-	discoveryMessage string = "pelotari?"
+	discoveryMessage    string = "pelotari?"
+	discoveryMessageLen        = len(discoveryMessage)
 )
