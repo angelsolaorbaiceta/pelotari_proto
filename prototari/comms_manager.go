@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// BoradcastConn is the connection used to send and receive broadcast messages
+// A BroadcastConn is the connection used to send and receive broadcast messages
 // into the local private network.
 type BroadcastConn interface {
 	Write(buff []byte) (int, error)
