@@ -1,17 +1,9 @@
 package prototari
 
 import (
-	"fmt"
 	"net"
 	"time"
 )
-
-// A BroadcastConn is the connection used to send and receive broadcast messages
-// into the local private network.
-type BroadcastConn interface {
-	Write(buff []byte) (int, error)
-	Read(buff []byte) (int, *net.UDPAddr, error)
-}
 
 // A CommsManager is the central authority in the Pelotari protocol.
 // It deals with discovering and registering peers, as well as sending periodic
@@ -19,16 +11,19 @@ type BroadcastConn interface {
 // amount of time.
 type CommsManager struct {
 	broadcaster BroadcastConn
+	unicaster   UnicastConn
 	config      Config
 	peers       map[net.Addr]Peer
 }
 
 func MakeManager(
 	broadcaster BroadcastConn,
+	unicaster UnicastConn,
 	config Config,
 ) *CommsManager {
 	return &CommsManager{
 		broadcaster: broadcaster,
+		unicaster:   unicaster,
 		config:      config,
 		peers:       make(map[net.Addr]Peer, config.MaxPeers),
 	}
@@ -48,8 +43,10 @@ func (manager *CommsManager) Start() {
 	// 1. Broadcasting
 	go func() {
 		for {
-			// TODO: error handling
-			manager.broadcaster.Write([]byte(discoveryMessage))
+			_, err := manager.broadcaster.Write([]byte(discoveryMessage))
+			if err != nil {
+				// TODO: error handling
+			}
 			time.Sleep(manager.config.BroadcastInterval)
 		}
 	}()
@@ -59,13 +56,19 @@ func (manager *CommsManager) Start() {
 		buff := make([]byte, 128)
 
 		for {
-			n, _, err := manager.broadcaster.Read(buff)
+			n, respAddr, err := manager.broadcaster.Read(buff)
 			if err != nil {
 				// TODO: error handling
 			}
 
+			// TODO: ignore own messages
 			message := string(buff[:n])
-			fmt.Println(message)
+			if message == discoveryMessage {
+				peerAddr := respAddr
+				peerAddr.Port = UnicastPort
+
+				manager.unicaster.Write([]byte(responseMessage), respAddr)
+			}
 		}
 	}()
 }

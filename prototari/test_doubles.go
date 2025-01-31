@@ -2,38 +2,86 @@ package prototari
 
 import (
 	"net"
-
-	"github.com/stretchr/testify/mock"
 )
 
-type fakeBroadcastConn struct {
-	mock.Mock
-	writeChan chan<- []byte
-	readChan  <-chan []byte
+const fakeBroadcastAddr = "192.168.0.255"
 
-	written [][]byte
-	read    [][]byte
+type fakeMsgRecord struct {
+	IsUnicast bool
+	From      *net.UDPAddr
+	To        *net.UDPAddr
+	Payload   []byte
+}
+
+type fakeBroadcastConn struct {
+	writeChan chan<- fakeMsgRecord
+	readChan  <-chan fakeMsgRecord
+
+	localAddr *net.UDPAddr
+
+	written chan<- fakeMsgRecord
+}
+
+func (fg *fakeBroadcastConn) LocalAddr() *net.UDPAddr {
+	return fg.localAddr
 }
 
 func (fb *fakeBroadcastConn) Write(b []byte) (int, error) {
-	args := fb.Called(b)
-	if args.Error(1) == nil && fb.writeChan != nil {
-		fb.writeChan <- b
-		fb.written = append(fb.written, b)
+	if fb.writeChan == nil {
+		return 0, nil
 	}
 
-	return args.Int(0), args.Error(1)
+	msg := fakeMsgRecord{
+		IsUnicast: false,
+		Payload:   b,
+		From:      fb.localAddr,
+		To: &net.UDPAddr{
+			IP:   []byte(fakeBroadcastAddr),
+			Port: BroadcastPort,
+		},
+	}
+	fb.written <- msg
+	fb.writeChan <- msg
+
+	return len(b), nil
 }
 
 func (fb *fakeBroadcastConn) Read(b []byte) (int, *net.UDPAddr, error) {
-	args := fb.Called(b)
-	if args.Error(2) == nil && fb.readChan != nil {
-		messageBytes := <-fb.readChan
-		n := copy(b, messageBytes)
-		fb.read = append(fb.read, messageBytes)
+	message := <-fb.readChan
+	n := copy(b, message.Payload)
 
-		return n, args.Get(1).(*net.UDPAddr), args.Error(2)
+	return n, message.From, nil
+}
+
+type fakeUnicastConn struct {
+	writeChan chan<- fakeMsgRecord
+	readChan  <-chan fakeMsgRecord
+
+	localAddr *net.UDPAddr
+
+	written chan<- fakeMsgRecord
+}
+
+func (fu *fakeUnicastConn) LocalAddr() *net.UDPAddr {
+	return fu.localAddr
+}
+
+func (fu *fakeUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
+	msg := fakeMsgRecord{
+		IsUnicast: true,
+		Payload:   b,
+		From:      fu.localAddr,
+		To:        to,
 	}
+	fu.written <- msg
+	fu.writeChan <- msg
 
-	return args.Int(0), args.Get(1).(*net.UDPAddr), args.Error(2)
+	return len(b), nil
+}
+
+func (fu *fakeUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
+	message := <-fu.readChan
+	n := copy(b, message.Payload)
+
+	return n, message.From, nil
 }

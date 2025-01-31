@@ -5,6 +5,9 @@ import "time"
 const (
 	defaultMaxPeers          int           = 64
 	defaultBroadcastInterval time.Duration = 5 * time.Second
+
+	BroadcastPort = 21451
+	UnicastPort   = 21450
 )
 
 // Config is the set of parameters that modify the protocol's behaviour.
