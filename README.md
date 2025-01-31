@@ -32,7 +32,9 @@ var (
 
 Start the `CommsManager` as a goroutine.
 This will start sending broadcast messages and automatically registering peers following the handshake procedure.
-You can defer stopping the 
+You can defer stopping the communications, which is done by the `Stop()`  method.
+Calling `Stop()` deregisters all peers, but keeps the connections open.
+(To close them, you'd call the `Close()` method, as explained below.)
 
 ```go
 go manager.Start()
