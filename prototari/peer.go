@@ -9,14 +9,32 @@ import (
 // can talk to and receive messages from.
 type Peer struct {
 	// The peer's IP address inside the private network.
-	ip net.IP
+	IP net.IP
 
 	// The time when the last message from the peer was received.
-	lastSeen time.Time
-
-	// The UDP "connection" to send messages to this peer.
-	conn *net.UDPConn
+	LastSeen time.Time
 
 	// The number of heartbeats the peer hasn't responded to.
-	missedHeartbeats int
+	MissedHeartbeats int
+}
+
+func MakePeer(IP net.IP) Peer {
+	return Peer{
+		IP:               IP,
+		LastSeen:         time.Now(),
+		MissedHeartbeats: 0,
+	}
+}
+
+func (p Peer) Address() *net.UDPAddr {
+	return &net.UDPAddr{
+		IP:   p.IP,
+		Port: UnicastPort,
+	}
+}
+
+// Equal returs whether this and other peer are the same.
+// Peers are identified by their IP address.
+func (p Peer) Equal(other Peer) bool {
+	return p.IP.Equal(other.IP)
 }

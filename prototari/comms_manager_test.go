@@ -76,14 +76,14 @@ func TestCommsManager(t *testing.T) {
 	t.Run("Successful handshake", func(t *testing.T) {
 		var got, want fakeMsgRecord
 
-		go broadcaster.Start()
-		go responder.Start()
+		broadcaster.Start()
+		responder.Start()
 		defer func() {
 			broadcaster.Stop()
 			responder.Stop()
 		}()
 
-		// Wait for the broadcast message to be sent
+		// Wait for the broadcast message to be sent by the broadcaster
 		got = <-writtenMsgsChan
 		want = fakeMsgRecord{
 			IsUnicast: false,
@@ -96,7 +96,7 @@ func TestCommsManager(t *testing.T) {
 		}
 		assert.Equal(t, want, got)
 
-		// Wait for the broadcast message to be read
+		// Wait for the response message to be sent by the responder
 		got = <-writtenMsgsChan
 		want = fakeMsgRecord{
 			IsUnicast: true,
@@ -108,5 +108,25 @@ func TestCommsManager(t *testing.T) {
 			Payload: []byte(responseMessage),
 		}
 		assert.Equal(t, want, got)
+
+		// Wait for the confirmatio message to be sent by the broadcaster
+		got = <-writtenMsgsChan
+		want = fakeMsgRecord{
+			IsUnicast: true,
+			From:      &broadcasterUniAddr,
+			To: &net.UDPAddr{
+				IP:   []byte(responderIP),
+				Port: UnicastPort,
+			},
+			Payload: []byte(confirmationMessage),
+		}
+		assert.Equal(t, want, got)
+
+		// Check that the peer is correctly registered
+		wantPeer := Peer{
+			IP: []byte(responderIP),
+		}
+		gotPeer := broadcaster.Peers()[0]
+		assert.True(t, wantPeer.Equal(gotPeer))
 	})
 }

@@ -6,4 +6,7 @@ const (
 
 	responseMessage    string = "aupa!"
 	responseMessageLen        = len(responseMessage)
+
+	confirmationMessage    string = "dale!"
+	confirmationMessageLen        = len(confirmationMessage)
 )
