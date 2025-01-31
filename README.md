@@ -21,8 +21,27 @@ The protocol is implemented as a Go library: **prototari** (protocol pelotari).
 
 ## Usage
 
-TODO: Explain the usage.
+Instantiate a `CommsManager` passing it your desired configuration parameters, or using the default ones:
 
+```go
+var (
+    config  = prototari.MakeDefaultConfig()
+    manager = prototari.MakeManager(config)
+)
+```
 
+Start the `CommsManager` as a goroutine.
+This will start sending broadcast messages and automatically registering peers following the handshake procedure.
+You can defer stopping the 
 
+```go
+go manager.Start()
+defer manager.Stop()
+```
 
+The peers will be automatically registered and unregistered for you.
+If you want to send a message to all peers, use the `CommsManager` `SendMessage()` method:
+
+```go
+manager.SendMessage([]byte("My message"))
+```
