@@ -27,10 +27,6 @@ func (fg *fakeBroadcastConn) LocalAddr() *net.UDPAddr {
 }
 
 func (fb *fakeBroadcastConn) Write(b []byte) (int, error) {
-	if fb.writeChan == nil {
-		return 0, nil
-	}
-
 	msg := fakeMsgRecord{
 		IsUnicast: false,
 		Payload:   b,
@@ -41,12 +37,21 @@ func (fb *fakeBroadcastConn) Write(b []byte) (int, error) {
 		},
 	}
 	fb.written <- msg
+
+	if fb.writeChan == nil {
+		return 0, nil
+	}
+
 	fb.writeChan <- msg
 
 	return len(b), nil
 }
 
 func (fb *fakeBroadcastConn) Read(b []byte) (int, *net.UDPAddr, error) {
+	if fb.readChan == nil {
+		return 0, nil, net.ErrClosed
+	}
+
 	message := <-fb.readChan
 	n := copy(b, message.Payload)
 
@@ -74,12 +79,21 @@ func (fu *fakeUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
 		To:        to,
 	}
 	fu.written <- msg
+
+	if fu.writeChan == nil {
+		return 0, nil
+	}
+
 	fu.writeChan <- msg
 
 	return len(b), nil
 }
 
 func (fu *fakeUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
+	if fu.readChan == nil {
+		return 0, nil, net.ErrClosed
+	}
+
 	message := <-fu.readChan
 	n := copy(b, message.Payload)
 
