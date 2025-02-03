@@ -140,7 +140,7 @@ func TestCommsManager(t *testing.T) {
 		assert.True(t, wantPeer.Equal(gotPeer))
 	})
 
-	t.Run("Broadcaster ignores it's own messages", func(t *testing.T) {
+	t.Run("Broadcaster ignores its own messages", func(t *testing.T) {
 		// The broadcaster writes to and reads from the same channel.
 		// The broadcaster should ignore its own message and not respond to it.
 		// There should be no unicast response from it.
