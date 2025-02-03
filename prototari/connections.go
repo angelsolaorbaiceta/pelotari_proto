@@ -1,6 +1,8 @@
 package prototari
 
-import "net"
+import (
+	"net"
+)
 
 // A BroadcastConn is the connection used to send and receive broadcast messages
 // into the local private network.

@@ -2,7 +2,6 @@ package prototari
 
 import (
 	"errors"
-	"io"
 	"log"
 	"net"
 	"sync"
@@ -109,9 +108,6 @@ func (m *CommsManager) Start() {
 			default:
 				n, addr, err := m.broadcaster.Read(buff)
 				if err != nil {
-					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
-						return
-					}
 					log.Printf("Error reading broadcast: %v", err)
 					continue
 				}
@@ -144,9 +140,6 @@ func (m *CommsManager) Start() {
 			default:
 				n, addr, err := m.unicaster.Read(buff)
 				if err != nil {
-					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
-						return
-					}
 					log.Printf("Error reading unicast: %v", err)
 					continue
 				}

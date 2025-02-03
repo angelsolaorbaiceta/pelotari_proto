@@ -1,7 +1,10 @@
 package prototari
 
 import (
+	"errors"
+	"io"
 	"net"
+	"time"
 )
 
 const fakeBroadcastAddr = "192.168.0.255"
@@ -49,13 +52,19 @@ func (fb *fakeBroadcastConn) Write(b []byte) (int, error) {
 
 func (fb *fakeBroadcastConn) Read(b []byte) (int, *net.UDPAddr, error) {
 	if fb.readChan == nil {
-		return 0, nil, net.ErrClosed
+		time.Sleep(100 * time.Millisecond)
+		return 0, nil, io.EOF
 	}
 
-	message := <-fb.readChan
-	n := copy(b, message.Payload)
+	select {
+	case message := <-fb.readChan:
+		n := copy(b, message.Payload)
+		return n, message.From, nil
+	case <-time.After(25 * time.Millisecond):
+		break
+	}
 
-	return n, message.From, nil
+	return 0, nil, errors.New("broadcast timeout")
 }
 
 type fakeUnicastConn struct {
@@ -91,11 +100,18 @@ func (fu *fakeUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
 
 func (fu *fakeUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
 	if fu.readChan == nil {
-		return 0, nil, net.ErrClosed
+		time.Sleep(100 * time.Millisecond)
+		return 0, nil, io.EOF
 	}
 
-	message := <-fu.readChan
-	n := copy(b, message.Payload)
+	select {
+	case message := <-fu.readChan:
+		n := copy(b, message.Payload)
+		return n, message.From, nil
 
-	return n, message.From, nil
+	case <-time.After(25 * time.Millisecond):
+		break
+	}
+
+	return 0, nil, errors.New("unicast timeout")
 }
