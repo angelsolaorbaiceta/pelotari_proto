@@ -87,7 +87,12 @@ func (m *CommsManager) Start() {
 					log.Println("Sending a broadcast message failed")
 				}
 
-				time.Sleep(m.config.BroadcastInterval)
+				select {
+				case <-time.After(m.config.BroadcastInterval):
+					continue
+				case <-m.done:
+					return
+				}
 			}
 		}
 	}()
