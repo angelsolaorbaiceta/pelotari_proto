@@ -22,16 +22,16 @@ func TestCommsManager(t *testing.T) {
 			Port: 45678,
 		}
 		responderBroadAddr = net.UDPAddr{
-			IP:   []byte(broadcasterIP),
-			Port: 46799,
-		}
-		responderUniAddr = net.UDPAddr{
 			IP:   []byte(responderIP),
-			Port: 14567,
+			Port: 46799,
 		}
 		broadcasterUniAddr = net.UDPAddr{
 			IP:   []byte(responderIP),
 			Port: 24567,
+		}
+		responderUniAddr = net.UDPAddr{
+			IP:   []byte(broadcasterIP),
+			Port: 14567,
 		}
 	)
 
