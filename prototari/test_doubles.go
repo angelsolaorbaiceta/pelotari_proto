@@ -39,15 +39,17 @@ func (fb *fakeBroadcastConn) Write(b []byte) (int, error) {
 			Port: BroadcastPort,
 		},
 	}
-	fb.written <- msg
 
-	if fb.writeChan == nil {
-		return 0, nil
+	if fb.written != nil {
+		fb.written <- msg
 	}
 
-	fb.writeChan <- msg
+	if fb.writeChan != nil {
+		fb.writeChan <- msg
+		return len(b), nil
+	}
 
-	return len(b), nil
+	return 0, nil
 }
 
 func (fb *fakeBroadcastConn) Read(b []byte) (int, *net.UDPAddr, error) {
@@ -87,15 +89,17 @@ func (fu *fakeUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
 		From:      fu.localAddr,
 		To:        to,
 	}
-	fu.written <- msg
 
-	if fu.writeChan == nil {
-		return 0, nil
+	if fu.written != nil {
+		fu.written <- msg
 	}
 
-	fu.writeChan <- msg
+	if fu.writeChan != nil {
+		fu.writeChan <- msg
+		return len(b), nil
+	}
 
-	return len(b), nil
+	return 0, nil
 }
 
 func (fu *fakeUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
