@@ -140,7 +140,7 @@ func TestCommsManager(t *testing.T) {
 			IP: []byte(responderIP),
 		}
 		gotPeer := broadcaster.Peers()[0]
-		assert.True(t, wantPeer.Equal(gotPeer))
+		assert.True(t, wantPeer.Equal(gotPeer)) // Assertion fails
 	})
 
 	t.Run("Broadcaster ignores its own messages", func(t *testing.T) {

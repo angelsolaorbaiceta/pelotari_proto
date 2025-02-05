@@ -194,6 +194,6 @@ func (m *CommsManager) Stop() {
 	}
 
 	close(m.done)
-	m.wg.Wait()
+	m.wg.Wait() // Test gets stuck here
 	m.isRunning = false
 }
