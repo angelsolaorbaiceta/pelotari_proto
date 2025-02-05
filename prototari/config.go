@@ -30,3 +30,10 @@ func MakeDefaultConfig() Config {
 		BroadcastInterval: time.Duration(defaultBroadcastInterval),
 	}
 }
+
+func makeTestingConfig() Config {
+	return Config{
+		MaxPeers:          1,
+		BroadcastInterval: time.Duration(10 * time.Minute),
+	}
+}

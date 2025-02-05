@@ -2,6 +2,7 @@ package prototari
 
 import (
 	"net"
+	"runtime"
 	"testing"
 	"time"
 
@@ -35,12 +36,16 @@ func TestCommsManager(t *testing.T) {
 	)
 
 	t.Run("Successful handshake", func(t *testing.T) {
+		runtime.GOMAXPROCS(1)
+
 		var (
 			// A channel used for synchronization of the goroutines and assert that
 			// the expected messages have been exchanged between peers.
-			writtenMsgsChan = make(chan fakeMsgRecord)
-
+			writtenMsgsChan      = make(chan fakeMsgRecord)
 			broadCommsChan       = make(chan fakeMsgRecord)
+			broadToRespCommsChan = make(chan fakeMsgRecord)
+			respToBroadCommsChan = make(chan fakeMsgRecord)
+
 			broadcasterBroadConn = fakeBroadcastConn{
 				writeChan: broadCommsChan,
 				readChan:  nil,
@@ -53,10 +58,7 @@ func TestCommsManager(t *testing.T) {
 				readChan:  broadCommsChan,
 				localAddr: &responderBroadAddr,
 			}
-
-			broadToRespCommsChan = make(chan fakeMsgRecord)
-			respToBroadCommsChan = make(chan fakeMsgRecord)
-			broadcasterUnicConn  = fakeUnicastConn{
+			broadcasterUnicConn = fakeUnicastConn{
 				writeChan: broadToRespCommsChan,
 				readChan:  respToBroadCommsChan,
 				written:   writtenMsgsChan,
@@ -72,12 +74,12 @@ func TestCommsManager(t *testing.T) {
 			broadcaster = MakeManager(
 				&broadcasterBroadConn,
 				&broadcasterUnicConn,
-				MakeDefaultConfig(),
+				makeTestingConfig(),
 			)
 			responder = MakeManager(
 				&responderBroadConn,
 				&responderUnicConn,
-				MakeDefaultConfig(),
+				makeTestingConfig(),
 			)
 			got, want fakeMsgRecord
 		)
@@ -91,6 +93,7 @@ func TestCommsManager(t *testing.T) {
 			close(broadCommsChan)
 			close(broadToRespCommsChan)
 			close(respToBroadCommsChan)
+			close(writtenMsgsChan)
 		}()
 
 		// Wait for the broadcast message to be sent by the broadcaster
@@ -159,7 +162,7 @@ func TestCommsManager(t *testing.T) {
 				localAddr: &broadcasterUniAddr,
 				written:   writtenMsgsChan,
 			}
-			broadcaster = MakeManager(&broadConn, &unicConn, MakeDefaultConfig())
+			broadcaster = MakeManager(&broadConn, &unicConn, makeTestingConfig())
 
 			want, got fakeMsgRecord
 		)
