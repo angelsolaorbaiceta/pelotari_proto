@@ -26,11 +26,11 @@ func TestCommsManager(t *testing.T) {
 			Port: 46799,
 		}
 		broadcasterUniAddr = net.UDPAddr{
-			IP:   []byte(responderIP),
+			IP:   []byte(broadcasterIP),
 			Port: 24567,
 		}
 		responderUniAddr = net.UDPAddr{
-			IP:   []byte(broadcasterIP),
+			IP:   []byte(responderIP),
 			Port: 14567,
 		}
 	)
@@ -87,16 +87,17 @@ func TestCommsManager(t *testing.T) {
 		broadcaster.Start()
 		responder.Start()
 		defer func() {
-			broadcaster.Stop()
-			responder.Stop()
-
 			close(broadCommsChan)
 			close(broadToRespCommsChan)
 			close(respToBroadCommsChan)
 			close(writtenMsgsChan)
+
+			broadcaster.Stop()
+			responder.Stop()
 		}()
 
 		// Wait for the broadcast message to be sent by the broadcaster
+		// BROADCASTER --> EVERYONE
 		got = <-writtenMsgsChan
 		want = fakeMsgRecord{
 			IsUnicast: false,
@@ -110,6 +111,7 @@ func TestCommsManager(t *testing.T) {
 		assert.Equal(t, want, got)
 
 		// Wait for the response message to be sent by the responder
+		// RESPONDER --> BROADCASTER
 		got = <-writtenMsgsChan
 		want = fakeMsgRecord{
 			IsUnicast: true,
@@ -123,6 +125,7 @@ func TestCommsManager(t *testing.T) {
 		assert.Equal(t, want, got)
 
 		// Wait for the confirmatio message to be sent by the broadcaster
+		// BROADCASTER --> RESPONDER
 		got = <-writtenMsgsChan
 		want = fakeMsgRecord{
 			IsUnicast: true,
@@ -135,12 +138,14 @@ func TestCommsManager(t *testing.T) {
 		}
 		assert.Equal(t, want, got)
 
-		// Check that the peer is correctly registered
+		// Check that the peer is correctly registered in the broadcaster
 		wantPeer := Peer{
 			IP: []byte(responderIP),
 		}
 		gotPeer := broadcaster.Peers()[0]
-		assert.True(t, wantPeer.Equal(gotPeer)) // Assertion fails
+		assert.True(t, wantPeer.Equal(gotPeer))
+
+		// Check that responder also has the peer
 	})
 
 	t.Run("Broadcaster ignores its own messages", func(t *testing.T) {
