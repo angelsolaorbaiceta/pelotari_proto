@@ -2,7 +2,6 @@ package prototari
 
 import (
 	"net"
-	"runtime"
 	"testing"
 	"time"
 
@@ -36,12 +35,8 @@ func TestCommsManager(t *testing.T) {
 	)
 
 	t.Run("Successful handshake", func(t *testing.T) {
-		runtime.GOMAXPROCS(1)
-
 		var (
-			// A channel used for synchronization of the goroutines and assert that
-			// the expected messages have been exchanged between peers.
-			writtenMsgsChan      = make(chan fakeMsgRecord)
+			writtenMsgsChan      = make(chan fakeMsgRecord) // For synchronization
 			broadCommsChan       = make(chan fakeMsgRecord)
 			broadToRespCommsChan = make(chan fakeMsgRecord)
 			respToBroadCommsChan = make(chan fakeMsgRecord)
@@ -144,8 +139,6 @@ func TestCommsManager(t *testing.T) {
 		}
 		gotPeer := broadcaster.Peers()[0]
 		assert.True(t, wantPeer.Equal(gotPeer))
-
-		// Check that responder also has the peer
 	})
 
 	t.Run("Broadcaster ignores its own messages", func(t *testing.T) {
@@ -174,9 +167,9 @@ func TestCommsManager(t *testing.T) {
 
 		broadcaster.Start()
 		defer func() {
-			broadcaster.Stop()
 			close(broadCh)
 			close(writtenMsgsChan)
+			broadcaster.Stop()
 		}()
 
 		// Wait for the broadcast message to be sent by the broadcaster

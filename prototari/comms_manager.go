@@ -170,7 +170,7 @@ func (m *CommsManager) completeHandshake(peerAddr *net.UDPAddr) {
 
 	_, err := m.unicaster.Write([]byte(confirmationMessage), peer.Address())
 	if err != nil {
-		// TODO: handle error
+		// TODO: handle error. Retry or fail to register peer
 		return
 	}
 }
@@ -194,6 +194,6 @@ func (m *CommsManager) Stop() {
 	}
 
 	close(m.done)
-	m.wg.Wait() // Test gets stuck here
+	m.wg.Wait()
 	m.isRunning = false
 }

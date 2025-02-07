@@ -6,7 +6,10 @@ import (
 	"time"
 )
 
-const fakeBroadcastAddr = "192.168.0.255"
+const (
+	fakeBroadcastAddr = "192.168.0.255"
+	failReadTimeout   = 100 * time.Millisecond
+)
 
 type fakeMsgRecord struct {
 	IsUnicast bool
@@ -39,12 +42,9 @@ func (fb *fakeBroadcastConn) Write(b []byte) (int, error) {
 		},
 	}
 
-	if fb.written != nil {
-		fb.written <- msg
-	}
-
 	if fb.writeChan != nil {
 		fb.writeChan <- msg
+		fb.written <- msg
 		return len(b), nil
 	}
 
@@ -53,11 +53,17 @@ func (fb *fakeBroadcastConn) Write(b []byte) (int, error) {
 
 func (fb *fakeBroadcastConn) Read(b []byte) (int, *net.UDPAddr, error) {
 	if fb.readChan == nil {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(failReadTimeout)
 		return 0, nil, io.EOF
 	}
 
-	message := <-fb.readChan
+	// The goroutine might get stuck here waiting for a new message to be sent
+	// to the channel. We want to finish gracefully when the read channel is
+	// closed, and so the ok is handled to return an error.
+	message, ok := <-fb.readChan
+	if !ok {
+		return 0, nil, io.EOF
+	}
 	n := copy(b, message.Payload)
 	return n, message.From, nil
 }
@@ -83,12 +89,9 @@ func (fu *fakeUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
 		To:        to,
 	}
 
-	if fu.written != nil {
-		fu.written <- msg
-	}
-
 	if fu.writeChan != nil {
 		fu.writeChan <- msg
+		fu.written <- msg
 		return len(b), nil
 	}
 
@@ -97,11 +100,17 @@ func (fu *fakeUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
 
 func (fu *fakeUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
 	if fu.readChan == nil {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(failReadTimeout)
 		return 0, nil, io.EOF
 	}
 
-	message := <-fu.readChan
+	// The goroutine might get stuck here waiting for a new message to be sent
+	// to the channel. We want to finish gracefully when the read channel is
+	// closed, and so the ok is handled to return an error.
+	message, ok := <-fu.readChan
+	if !ok {
+		return 0, nil, io.EOF
+	}
 	n := copy(b, message.Payload)
 	return n, message.From, nil
 }
