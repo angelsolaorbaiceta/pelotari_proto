@@ -1,6 +1,8 @@
 package prototari
 
 import (
+	"io"
+	"log"
 	"net"
 	"testing"
 	"time"
@@ -33,6 +35,10 @@ func TestCommsManager(t *testing.T) {
 			Port: 14567,
 		}
 	)
+
+	originalOutput := log.Writer()
+	log.SetOutput(io.Discard)
+	defer func() { log.SetOutput(originalOutput) }()
 
 	t.Run("Successful handshake", func(t *testing.T) {
 		var (
