@@ -40,13 +40,12 @@ func TestCommsManager(t *testing.T) {
 	log.SetOutput(io.Discard)
 	defer func() { log.SetOutput(originalOutput) }()
 
-	t.Run("Successful handshake", func(t *testing.T) {
+	makePeers := func(
+		writtenMsgsChan,
+		broadCommsChan,
+		broadToRespCommsChan, respToBroadCommsChan chan fakeMsgRecord,
+	) (broadcaster, responder *CommsManager) {
 		var (
-			writtenMsgsChan      = make(chan fakeMsgRecord) // For synchronization
-			broadCommsChan       = make(chan fakeMsgRecord, 1)
-			broadToRespCommsChan = make(chan fakeMsgRecord, 1)
-			respToBroadCommsChan = make(chan fakeMsgRecord, 1)
-
 			broadcasterBroadConn = fakeBroadcastConn{
 				writeChan: broadCommsChan,
 				readChan:  nil,
@@ -71,17 +70,34 @@ func TestCommsManager(t *testing.T) {
 				written:   writtenMsgsChan,
 				localAddr: &responderUniAddr,
 			}
+		)
 
-			broadcaster = MakeManager(
-				&broadcasterBroadConn,
-				&broadcasterUnicConn,
-				makeTestingConfig(),
+		broadcaster = MakeManager(
+			&broadcasterBroadConn,
+			&broadcasterUnicConn,
+			makeTestingConfig(),
+		)
+		responder = MakeManager(
+			&responderBroadConn,
+			&responderUnicConn,
+			makeTestingConfig(),
+		)
+
+		return
+	}
+
+	t.Run("Successful handshake", func(t *testing.T) {
+		var (
+			writtenMsgsChan      = make(chan fakeMsgRecord) // For synchronization
+			broadCommsChan       = make(chan fakeMsgRecord, 1)
+			broadToRespCommsChan = make(chan fakeMsgRecord, 1)
+			respToBroadCommsChan = make(chan fakeMsgRecord, 1)
+
+			broadcaster, responder = makePeers(
+				writtenMsgsChan, broadCommsChan,
+				broadToRespCommsChan, respToBroadCommsChan,
 			)
-			responder = MakeManager(
-				&responderBroadConn,
-				&responderUnicConn,
-				makeTestingConfig(),
-			)
+
 			got, want fakeMsgRecord
 		)
 
@@ -213,20 +229,8 @@ func TestCommsManager(t *testing.T) {
 		var (
 			writtenMsgsChan = make(chan fakeMsgRecord)
 			broadCh         = make(chan fakeMsgRecord, 1)
-			broadConn       = fakeBroadcastConn{
-				writeChan: broadCh,
-				readChan:  nil,
-				written:   writtenMsgsChan,
-				localAddr: &broadcasterBroadAddr,
-			}
-			unicConn = fakeUnicastConn{
-				writeChan: nil,
-				readChan:  nil,
-				written:   nil,
-				localAddr: &broadcasterBroadAddr,
-			}
-			broadcaster = MakeManager(&broadConn, &unicConn, makeTestingConfig())
-			peer        = Peer{IP: []byte(responderIP)}
+			broadcaster, _  = makePeers(writtenMsgsChan, broadCh, nil, nil)
+			peer            = Peer{IP: []byte(responderIP)}
 		)
 
 		broadcaster.registerPeer(peer)
@@ -246,4 +250,5 @@ func TestCommsManager(t *testing.T) {
 			// Test passes. No message received in the timeout.
 		}
 	})
+
 }
