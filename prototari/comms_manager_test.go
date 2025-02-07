@@ -43,9 +43,9 @@ func TestCommsManager(t *testing.T) {
 	t.Run("Successful handshake", func(t *testing.T) {
 		var (
 			writtenMsgsChan      = make(chan fakeMsgRecord) // For synchronization
-			broadCommsChan       = make(chan fakeMsgRecord)
-			broadToRespCommsChan = make(chan fakeMsgRecord)
-			respToBroadCommsChan = make(chan fakeMsgRecord)
+			broadCommsChan       = make(chan fakeMsgRecord, 1)
+			broadToRespCommsChan = make(chan fakeMsgRecord, 1)
+			respToBroadCommsChan = make(chan fakeMsgRecord, 1)
 
 			broadcasterBroadConn = fakeBroadcastConn{
 				writeChan: broadCommsChan,
