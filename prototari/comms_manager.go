@@ -18,6 +18,7 @@ type CommsManager struct {
 
 	config Config
 
+	peersCh    chan []Peer
 	peers      map[string]Peer
 	peersMutex sync.RWMutex
 
@@ -35,22 +36,22 @@ func MakeManager(
 		broadcaster: broadcaster,
 		unicaster:   unicaster,
 		config:      config,
+		peersCh:     make(chan []Peer, 1),
 		peers:       make(map[string]Peer, config.MaxPeers),
 		isRunning:   false,
 	}
 }
 
-// Peers returns a slice of the currently registered peers.
-func (m *CommsManager) Peers() []Peer {
+// PeersCh returns a channel of the registered peers.
+func (m *CommsManager) PeersCh() <-chan []Peer {
+	return m.peersCh
+}
+
+func (m *CommsManager) NOfPeers() int {
 	m.peersMutex.RLock()
 	defer m.peersMutex.RUnlock()
 
-	peers := make([]Peer, 0, len(m.peers))
-	for _, peer := range m.peers {
-		peers = append(peers, peer)
-	}
-
-	return peers
+	return len(m.peers)
 }
 
 // Start begins the peer discovery mechanism and listens for incoming messages
@@ -82,9 +83,11 @@ func (m *CommsManager) Start() {
 			case <-m.done:
 				return
 			default:
-				_, err := m.broadcaster.Write([]byte(discoveryMessage))
-				if err != nil {
-					log.Println("Sending a broadcast message failed")
+				if m.NOfPeers() < m.config.MaxPeers {
+					_, err := m.broadcaster.Write([]byte(discoveryMessage))
+					if err != nil {
+						log.Println("Sending a broadcast message failed")
+					}
 				}
 
 				select {
@@ -151,6 +154,7 @@ func (m *CommsManager) Start() {
 
 				message := buff[:n]
 				if string(message) == responseMessage {
+					// TODO: handle error
 					m.completeHandshake(addr)
 				} else if string(message) == confirmationMessage {
 					peer := MakePeer(addr.IP)
@@ -165,20 +169,22 @@ func (m *CommsManager) Start() {
 // completeHandshake is called by the broadcaster to add the responder as a peer
 // and send the confirmation message that completes the handshake.
 //
-// If the maximum number of peers is already reached, it does nothing.
-func (m *CommsManager) completeHandshake(peerAddr *net.UDPAddr) {
+// It returns an error if the maximum number of peers are already registered.
+func (m *CommsManager) completeHandshake(peerAddr *net.UDPAddr) error {
 	peer := MakePeer(peerAddr.IP)
 	if err := m.registerPeer(peer); err != nil {
-		return
+		return err
 	}
 
 	_, err := m.unicaster.Write([]byte(confirmationMessage), peer.Address())
-	if err != nil {
-		// TODO: handle error. Retry or fail to register peer
-		return
-	}
+
+	return err
 }
 
+// registerPeer attempts to register a peer and sends a message to the peers
+// channel with the new registered peers.
+//
+// It returns an error if the maximum number of peers are already registered.
 func (m *CommsManager) registerPeer(peer Peer) error {
 	m.peersMutex.Lock()
 	defer m.peersMutex.Unlock()
@@ -188,6 +194,21 @@ func (m *CommsManager) registerPeer(peer Peer) error {
 	}
 
 	m.peers[string(peer.IP)] = peer
+
+	// Send the new peers to the peers channel, replacing the last sent
+	// value, if any.
+	peers := make([]Peer, 0, len(m.peers))
+	for _, peer := range m.peers {
+		peers = append(peers, peer)
+	}
+
+	select {
+	case <-m.peersCh:
+		// There was an unread item, just discarded
+		m.peersCh <- peers
+	default:
+		m.peersCh <- peers
+	}
 
 	return nil
 }

@@ -143,14 +143,16 @@ func TestCommsManager(t *testing.T) {
 		wantPeer := Peer{
 			IP: []byte(responderIP),
 		}
-		gotPeer := broadcaster.Peers()[0]
+		broadcasterPeers := <-broadcaster.PeersCh()
+		gotPeer := broadcasterPeers[0]
 		assert.True(t, wantPeer.Equal(gotPeer))
 
 		// Check that the responder registered the broadcaster
 		wantPeer = Peer{
 			IP: []byte(broadcasterIP),
 		}
-		gotPeer = responder.Peers()[0]
+		responderPeers := <-responder.PeersCh()
+		gotPeer = responderPeers[0]
 		assert.True(t, wantPeer.Equal(gotPeer))
 	})
 
@@ -159,19 +161,19 @@ func TestCommsManager(t *testing.T) {
 		// The broadcaster should ignore its own message and not respond to it.
 		// There should be no unicast response from it.
 		var (
-			broadCh         = make(chan fakeMsgRecord)
 			writtenMsgsChan = make(chan fakeMsgRecord)
+			broadCh         = make(chan fakeMsgRecord, 1)
 			broadConn       = fakeBroadcastConn{
 				writeChan: broadCh,
 				readChan:  broadCh,
-				localAddr: &broadcasterBroadAddr,
 				written:   writtenMsgsChan,
+				localAddr: &broadcasterBroadAddr,
 			}
 			unicConn = fakeUnicastConn{
 				writeChan: nil,
 				readChan:  nil,
-				localAddr: &broadcasterUniAddr,
 				written:   writtenMsgsChan,
+				localAddr: &broadcasterUniAddr,
 			}
 			broadcaster = MakeManager(&broadConn, &unicConn, makeTestingConfig())
 
@@ -199,6 +201,44 @@ func TestCommsManager(t *testing.T) {
 		assert.Equal(t, want, got)
 
 		// Make sure that no other message is sent
+		select {
+		case msg := <-writtenMsgsChan:
+			assert.FailNow(t, "A message was sent", string(msg.Payload))
+		case <-time.After(100 * time.Millisecond):
+			// Test passes. No message received in the timeout.
+		}
+	})
+
+	t.Run("Broadcaster with max peers registered doesn't send broadcast messages", func(t *testing.T) {
+		var (
+			writtenMsgsChan = make(chan fakeMsgRecord)
+			broadCh         = make(chan fakeMsgRecord, 1)
+			broadConn       = fakeBroadcastConn{
+				writeChan: broadCh,
+				readChan:  nil,
+				written:   writtenMsgsChan,
+				localAddr: &broadcasterBroadAddr,
+			}
+			unicConn = fakeUnicastConn{
+				writeChan: nil,
+				readChan:  nil,
+				written:   nil,
+				localAddr: &broadcasterBroadAddr,
+			}
+			broadcaster = MakeManager(&broadConn, &unicConn, makeTestingConfig())
+			peer        = Peer{IP: []byte(responderIP)}
+		)
+
+		broadcaster.registerPeer(peer)
+
+		broadcaster.Start()
+		defer func() {
+			close(broadCh)
+			close(writtenMsgsChan)
+			broadcaster.Stop()
+		}()
+
+		// Make sure that no discovery message is sent
 		select {
 		case msg := <-writtenMsgsChan:
 			assert.FailNow(t, "A message was sent", string(msg.Payload))

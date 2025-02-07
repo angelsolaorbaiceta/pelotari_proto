@@ -30,7 +30,7 @@ A diagram of the discovery process is as follows:
 
 ```
 +-----------------+     Broadcast (port 21451)      +-----------------+
-|   Broadcaster   |-------------------------------->|    Listeners    |
+|   Broadcaster   |-------------------------------->|    Responder    |
 +-----------------+       [pelotari?]               +-----------------+
         |                                                  |
         |                                                  |
@@ -40,7 +40,7 @@ A diagram of the discovery process is as follows:
         |
         V
 +-----------------+     Handshake (port 21450)      +-----------------+
-|   Broadcaster   |-------------------------------->|    Listener     |
+|   Broadcaster   |-------------------------------->|    Responder    |
 +-----------------+       [dale!]                   +-----------------+
         |                                                   |
         |                                                   |
@@ -48,7 +48,7 @@ A diagram of the discovery process is as follows:
         |                                                   |
         V                                                   V
 +-----------------+                                 +-----------------+
-|   Broadcaster   |                                 |    Listener     |
+|   Broadcaster   |                                 |    Responder    |
 |   (Peer List)   |                                 |   (Peer List)   |
 +-----------------+                                 +-----------------+
 ```
