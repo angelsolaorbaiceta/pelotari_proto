@@ -145,6 +145,13 @@ func TestCommsManager(t *testing.T) {
 		}
 		gotPeer := broadcaster.Peers()[0]
 		assert.True(t, wantPeer.Equal(gotPeer))
+
+		// Check that the responder registered the broadcaster
+		wantPeer = Peer{
+			IP: []byte(broadcasterIP),
+		}
+		gotPeer = responder.Peers()[0]
+		assert.True(t, wantPeer.Equal(gotPeer))
 	})
 
 	t.Run("Broadcaster ignores its own messages", func(t *testing.T) {

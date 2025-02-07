@@ -152,6 +152,10 @@ func (m *CommsManager) Start() {
 				message := buff[:n]
 				if string(message) == responseMessage {
 					m.completeHandshake(addr)
+				} else if string(message) == confirmationMessage {
+					peer := MakePeer(addr.IP)
+					// TODO: handle error
+					m.registerPeer(peer)
 				}
 			}
 		}
