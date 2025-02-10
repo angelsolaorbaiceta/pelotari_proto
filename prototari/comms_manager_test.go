@@ -86,27 +86,40 @@ func TestCommsManager(t *testing.T) {
 		return
 	}
 
-	t.Run("Successful handshake", func(t *testing.T) {
+	makeConnectedPeers := func(
+		writtenMsgsChan chan fakeMsgRecord,
+	) (broadcaster, responder *CommsManager, closeChans func()) {
 		var (
-			writtenMsgsChan      = make(chan fakeMsgRecord) // For synchronization
 			broadCommsChan       = make(chan fakeMsgRecord, 1)
 			broadToRespCommsChan = make(chan fakeMsgRecord, 1)
 			respToBroadCommsChan = make(chan fakeMsgRecord, 1)
+		)
 
-			broadcaster, responder = makePeers(
-				writtenMsgsChan, broadCommsChan,
-				broadToRespCommsChan, respToBroadCommsChan,
-			)
+		broadcaster, responder = makePeers(
+			writtenMsgsChan, broadCommsChan,
+			broadToRespCommsChan, respToBroadCommsChan,
+		)
 
-			got, want fakeMsgRecord
+		closeChans = func() {
+			close(broadCommsChan)
+			close(broadToRespCommsChan)
+			close(respToBroadCommsChan)
+		}
+
+		return broadcaster, responder, closeChans
+	}
+
+	t.Run("Successful handshake", func(t *testing.T) {
+		var (
+			writtenMsgsChan                    = make(chan fakeMsgRecord)
+			broadcaster, responder, closeChans = makeConnectedPeers(writtenMsgsChan)
+			got, want                          fakeMsgRecord
 		)
 
 		broadcaster.Start()
 		responder.Start()
 		defer func() {
-			close(broadCommsChan)
-			close(broadToRespCommsChan)
-			close(respToBroadCommsChan)
+			closeChans()
 			close(writtenMsgsChan)
 
 			broadcaster.Stop()
@@ -230,7 +243,7 @@ func TestCommsManager(t *testing.T) {
 			writtenMsgsChan = make(chan fakeMsgRecord)
 			broadCh         = make(chan fakeMsgRecord, 1)
 			broadcaster, _  = makePeers(writtenMsgsChan, broadCh, nil, nil)
-			peer            = Peer{IP: []byte(responderIP)}
+			peer            = MakePeer([]byte(responderIP))
 		)
 
 		broadcaster.registerPeer(peer)
@@ -251,4 +264,34 @@ func TestCommsManager(t *testing.T) {
 		}
 	})
 
+	t.Run("Broadcasts from a broadcaster that's already registered aren't answered", func(t *testing.T) {
+		var (
+			writtenMsgsChan                    = make(chan fakeMsgRecord)
+			broadcaster, responder, closeChans = makeConnectedPeers(writtenMsgsChan)
+			peer                               = MakePeer([]byte(broadcasterIP))
+		)
+
+		responder.registerPeer(peer)
+
+		broadcaster.Start()
+		responder.Start()
+		defer func() {
+			closeChans()
+			close(writtenMsgsChan)
+			broadcaster.Stop()
+			responder.Stop()
+		}()
+
+		// Wait for the discovery message to be sent
+		discoveryMsg := <-writtenMsgsChan
+		assert.False(t, discoveryMsg.IsUnicast)
+
+		// Make sure that the responder doesn't respond to the broadcast
+		select {
+		case msg := <-writtenMsgsChan:
+			assert.FailNow(t, "A message was sent", string(msg.Payload))
+		case <-time.After(100 * time.Millisecond):
+			// Test passes. No message received in the timeout.
+		}
+	})
 }

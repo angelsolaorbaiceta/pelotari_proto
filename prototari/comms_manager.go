@@ -47,11 +47,20 @@ func (m *CommsManager) PeersCh() <-chan []Peer {
 	return m.peersCh
 }
 
-func (m *CommsManager) NOfPeers() int {
+func (m CommsManager) NOfPeers() int {
 	m.peersMutex.RLock()
 	defer m.peersMutex.RUnlock()
 
 	return len(m.peers)
+}
+
+// hasPeer checks if a peer with a given IP is registered.
+func (m CommsManager) hasPeer(IP net.IP) bool {
+	m.peersMutex.RLock()
+	defer m.peersMutex.RUnlock()
+
+	_, ok := m.peers[string(IP)]
+	return ok
 }
 
 // Start begins the peer discovery mechanism and listens for incoming messages
@@ -125,7 +134,7 @@ func (m *CommsManager) Start() {
 					continue
 				}
 
-				if string(buff[:n]) == discoveryMessage {
+				if string(buff[:n]) == discoveryMessage && !m.hasPeer(addr.IP) {
 					peerAddr := *addr
 					peerAddr.Port = UnicastPort
 
