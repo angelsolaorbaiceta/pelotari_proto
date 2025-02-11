@@ -43,10 +43,13 @@ func MakeManager(
 }
 
 // PeersCh returns a channel of the registered peers.
+// The channel is a buffered channel with a capacity of one.
+// The CommsManager sends the most up-to-date list of registered peers.
 func (m *CommsManager) PeersCh() <-chan []Peer {
 	return m.peersCh
 }
 
+// NOfPeers returns the currently registered number of peers.
 func (m CommsManager) NOfPeers() int {
 	m.peersMutex.RLock()
 	defer m.peersMutex.RUnlock()
@@ -222,6 +225,7 @@ func (m *CommsManager) registerPeer(peer Peer) error {
 	return nil
 }
 
+// Stop signals all concurrent processes of the CommsManager to stop.
 func (m *CommsManager) Stop() {
 	if !m.isRunning {
 		return
