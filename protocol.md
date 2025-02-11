@@ -73,10 +73,8 @@ When a peer receives a broadcast message from another peer, here's what it does:
 1. If the broadcaster is already registered as peer, ignore the message and skip the rest of the steps.
 2. If the maximum number of peers is already registered, ignore the message and skip the rest of the steps.
 3. Send a UDP unicast response to the broadcaster on port `21450` with the message `aupa!`.
-4. Save the broadcaster as a potential peer, but don't register it yet. This blocks a spot in the remaining peers list.
-5. If the response from the broadcaster arrives before a specified timeout, add the broadcaster as peer.
-   If the timeout elapses without a response, unblock the spot that was reserved in the previous step.
-   If the response arrives after the timeout, when the spot isn't registered anymore, ignore the message.
+4. When the confirmation from the broadcaster arrives, add the broadcaster as peer.
+   If the confirmation never arrives, the broadcaster isn't added as peer.
 
 ### 1.c Handshake
 
@@ -86,6 +84,8 @@ When the original broadcaster receives a response, here's what it does:
 2. Add the responding machine as peer.
 3. Confirm the registration of the new peer by sending it a unicast UDP message to port `21450`.
    The message should contain the string: `dale!`.
+
+If the responder is added as peer but never received the confirmation message, it will be removed from the peers list by the heartbeat part of the protocol.
 
 ## 2. Heartbeat
 
