@@ -66,16 +66,8 @@ func (m CommsManager) hasPeer(IP net.IP) bool {
 	return ok
 }
 
-// Start begins the peer discovery mechanism and listens for incoming messages
-// from registered peers.
-//
-// The discovery mechanism consists of three different tasks that run
-// concurrently:
-//
-//  1. Broadcasting: Broadcasts the discovery message every few seconds.
-//  2. Responding: Listens to broadcasts from other peers and resonds with a
-//     response message.
-//  3. Handshake: Sends a unicast message to confirm adding a peer.
+// Start begins the peer discovery and heartbeat mechanisms and listens for
+// incoming messages from registered peers.
 func (m *CommsManager) Start() {
 	if m.isRunning {
 		return
@@ -86,96 +78,97 @@ func (m *CommsManager) Start() {
 	m.wg = sync.WaitGroup{}
 	m.wg.Add(3)
 
-	// 1. Broadcasting
-	go func() {
-		defer m.wg.Done()
+	go m.startBroadcasting()
+	go m.startRespondingToBroadcasts()
+	go m.startListeningToUnicast()
+}
 
-		for {
-			select {
-			case <-m.done:
-				return
-			default:
-				if m.NOfPeers() < m.config.MaxPeers {
-					_, err := m.broadcaster.Write([]byte(discoveryMessage))
-					if err != nil {
-						log.Println("Sending a broadcast message failed")
-					}
-				}
+func (m *CommsManager) startBroadcasting() {
+	defer m.wg.Done()
 
-				select {
-				case <-time.After(m.config.BroadcastInterval):
-					continue
-				case <-m.done:
-					return
-				}
-			}
-		}
-	}()
-
-	// 2. Responding to broadcast messages
-	go func() {
-		defer m.wg.Done()
-
-		var (
-			buff = make([]byte, 128)
-			myIp = m.broadcaster.LocalAddr().IP
-		)
-
-		for {
-			select {
-			case <-m.done:
-				return
-			default:
-				n, addr, err := m.broadcaster.Read(buff)
+	for {
+		select {
+		case <-m.done:
+			return
+		default:
+			if m.NOfPeers() < m.config.MaxPeers {
+				_, err := m.broadcaster.Write([]byte(discoveryMessage))
 				if err != nil {
-					log.Printf("Error reading broadcast: %v", err)
-					continue
-				}
-
-				// Ignore our own broadcast messages
-				if myIp.Equal(addr.IP) {
-					continue
-				}
-
-				if string(buff[:n]) == discoveryMessage && !m.hasPeer(addr.IP) {
-					peerAddr := *addr
-					peerAddr.Port = UnicastPort
-
-					m.unicaster.Write([]byte(responseMessage), &peerAddr)
+					log.Println("Sending a broadcast message failed")
 				}
 			}
-		}
-	}()
 
-	// 3. Unicast messages (including handshake)
-	go func() {
-		defer m.wg.Done()
-
-		buff := make([]byte, 1024)
-
-		for {
 			select {
+			case <-time.After(m.config.BroadcastInterval):
+				continue
 			case <-m.done:
 				return
-			default:
-				n, addr, err := m.unicaster.Read(buff)
-				if err != nil {
-					log.Printf("Error reading unicast: %v", err)
-					continue
-				}
-
-				message := buff[:n]
-				if string(message) == responseMessage {
-					// TODO: handle error
-					m.completeHandshake(addr)
-				} else if string(message) == confirmationMessage {
-					peer := MakePeer(addr.IP)
-					// TODO: handle error
-					m.registerPeer(peer)
-				}
 			}
 		}
-	}()
+	}
+}
+
+func (m *CommsManager) startRespondingToBroadcasts() {
+	defer m.wg.Done()
+
+	var (
+		buff = make([]byte, 128)
+		myIp = m.broadcaster.LocalAddr().IP
+	)
+
+	for {
+		select {
+		case <-m.done:
+			return
+		default:
+			n, addr, err := m.broadcaster.Read(buff)
+			if err != nil {
+				log.Printf("Error reading broadcast: %v", err)
+				continue
+			}
+
+			// Ignore our own broadcast messages
+			if myIp.Equal(addr.IP) {
+				continue
+			}
+
+			if string(buff[:n]) == discoveryMessage && !m.hasPeer(addr.IP) {
+				peerAddr := *addr
+				peerAddr.Port = UnicastPort
+
+				m.unicaster.Write([]byte(responseMessage), &peerAddr)
+			}
+		}
+	}
+}
+
+func (m *CommsManager) startListeningToUnicast() {
+	defer m.wg.Done()
+
+	buff := make([]byte, 1024)
+
+	for {
+		select {
+		case <-m.done:
+			return
+		default:
+			n, addr, err := m.unicaster.Read(buff)
+			if err != nil {
+				log.Printf("Error reading unicast: %v", err)
+				continue
+			}
+
+			message := buff[:n]
+			if string(message) == responseMessage {
+				// TODO: handle error
+				m.completeHandshake(addr)
+			} else if string(message) == confirmationMessage {
+				peer := MakePeer(addr.IP)
+				// TODO: handle error
+				m.registerPeer(peer)
+			}
+		}
+	}
 }
 
 // completeHandshake is called by the broadcaster to add the responder as a peer
