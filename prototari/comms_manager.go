@@ -50,7 +50,7 @@ func (m *CommsManager) PeersCh() <-chan []Peer {
 }
 
 // NOfPeers returns the currently registered number of peers.
-func (m CommsManager) NOfPeers() int {
+func (m *CommsManager) NOfPeers() int {
 	m.peersMutex.RLock()
 	defer m.peersMutex.RUnlock()
 
@@ -58,7 +58,7 @@ func (m CommsManager) NOfPeers() int {
 }
 
 // hasPeer checks if a peer with a given IP is registered.
-func (m CommsManager) hasPeer(IP net.IP) bool {
+func (m *CommsManager) hasPeer(IP net.IP) bool {
 	m.peersMutex.RLock()
 	defer m.peersMutex.RUnlock()
 
