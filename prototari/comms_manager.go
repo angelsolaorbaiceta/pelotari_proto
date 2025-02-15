@@ -27,6 +27,22 @@ type CommsManager struct {
 	wg        sync.WaitGroup
 }
 
+func MakeUDPManager(config Config) *CommsManager {
+	var (
+		broadcaster = UDPBroadcastConn{}
+		unicaster   = UDPUnicastConn{}
+	)
+
+	broadcaster.Connect()
+	unicaster.Connect()
+
+	return MakeManager(
+		&broadcaster,
+		&unicaster,
+		config,
+	)
+}
+
 func MakeManager(
 	broadcaster BroadcastConn,
 	unicaster UnicastConn,
@@ -113,7 +129,7 @@ func (m *CommsManager) startRespondingToBroadcasts() {
 
 	var (
 		buff = make([]byte, 128)
-		myIp = m.broadcaster.LocalAddr().IP
+		myIP = m.broadcaster.LocalAddr().IP
 	)
 
 	for {
@@ -128,7 +144,7 @@ func (m *CommsManager) startRespondingToBroadcasts() {
 			}
 
 			// Ignore our own broadcast messages
-			if myIp.Equal(addr.IP) {
+			if myIP.Equal(addr.IP) {
 				continue
 			}
 

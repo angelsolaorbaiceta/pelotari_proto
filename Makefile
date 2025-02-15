@@ -1,3 +1,6 @@
+run:
+	go run main.go
+
 test:
 	go test -timeout 5s ./...
 

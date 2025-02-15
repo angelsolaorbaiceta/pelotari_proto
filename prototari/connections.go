@@ -13,6 +13,7 @@ type BroadcastConn interface {
 	// Write sends a payload as a broadcast UDP message to the local network.
 	// It returns the number of sent bytes.
 	Write(b []byte) (int, error)
+
 	// Read receives broadcast messages from the local network.
 	// The number of read bytes and the UDP address of the sender are returned.
 	Read(b []byte) (int, *net.UDPAddr, error)
