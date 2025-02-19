@@ -68,6 +68,11 @@ func (fb *fakeBroadcastConn) Read(b []byte) (int, *net.UDPAddr, error) {
 	return n, message.From, nil
 }
 
+func (fu *fakeBroadcastConn) Close() {
+	// Nothing to do.
+	// Channels should be manually closed in the tests.
+}
+
 type fakeUnicastConn struct {
 	writeChan chan<- fakeMsgRecord
 	readChan  <-chan fakeMsgRecord
@@ -113,4 +118,9 @@ func (fu *fakeUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
 	}
 	n := copy(b, message.Payload)
 	return n, message.From, nil
+}
+
+func (fu *fakeUnicastConn) Close() {
+	// Nothing to do.
+	// Channels should be manually closed in the tests.
 }

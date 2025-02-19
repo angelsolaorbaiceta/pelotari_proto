@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 )
 
 // UDPBroadcastConn is an implementation of the BroadcastConn interface that uses
@@ -43,7 +44,6 @@ func (conn *UDPBroadcastConn) Connect() {
 		// If a UDP address can't be dialed, the protocol can't work.
 		log.Fatal(err)
 	}
-	fmt.Println("---> UDPBroadcastConn.locadAddresses() was called.")
 	conn.broadcastAddr = broadcastAddr
 
 	sendConn, err := net.DialUDP("udp", nil, conn.broadcastAddr)
@@ -78,6 +78,7 @@ func (conn UDPBroadcastConn) Write(b []byte) (int, error) {
 }
 
 func (conn UDPBroadcastConn) Read(b []byte) (int, *net.UDPAddr, error) {
+	conn.readConn.SetReadDeadline(time.Now().Add(connReadTimeout))
 	return conn.readConn.ReadFromUDP(b)
 }
 
@@ -151,6 +152,7 @@ func (conn UDPUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
 }
 
 func (conn UDPUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
+	conn.readConn.SetReadDeadline(time.Now().Add(connReadTimeout))
 	return conn.readConn.ReadFromUDP(b)
 }
 
