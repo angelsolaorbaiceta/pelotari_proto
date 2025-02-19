@@ -150,7 +150,6 @@ func (m *CommsManager) startRespondingToBroadcasts() {
 		default:
 			n, addr, err := m.broadcaster.Read(buff)
 			if err != nil {
-				// log.Printf("Error reading broadcast: %v", err)
 				continue
 			}
 
@@ -184,7 +183,6 @@ func (m *CommsManager) startListeningToUnicast() {
 		default:
 			n, addr, err := m.unicaster.Read(buff)
 			if err != nil {
-				// log.Printf("Error reading unicast: %v", err)
 				continue
 			}
 
