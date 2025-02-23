@@ -9,7 +9,7 @@ const (
 	BroadcastPort = 21451
 	UnicastPort   = 21450
 
-	connReadTimeout time.Duration = 250 * time.Millisecond
+	connReadTimeout time.Duration = 200 * time.Millisecond
 )
 
 // Config is the set of parameters that modify the protocol's behaviour.

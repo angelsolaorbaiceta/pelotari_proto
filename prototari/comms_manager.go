@@ -27,6 +27,27 @@ type CommsManager struct {
 	wg        sync.WaitGroup
 }
 
+// MakeUDPManager returns an instance of a CommsManager with the broadcaster
+// and unicaster connected and ready to send UDP messages.
+func MakeUDPManager(config Config) *CommsManager {
+	var (
+		broadcaster = UDPBroadcastConn{}
+		unicaster   = UDPUnicastConn{}
+	)
+
+	broadcaster.Connect()
+	unicaster.Connect()
+
+	return MakeManager(
+		&broadcaster,
+		&unicaster,
+		config,
+	)
+}
+
+// MakeManager returns an instance of a CommsManager with the passed in
+// broadcaster and unicaster. The underlying connections of the messagers
+// have to be connected by the client using this factory.
 func MakeManager(
 	broadcaster BroadcastConn,
 	unicaster UnicastConn,
@@ -84,7 +105,10 @@ func (m *CommsManager) Start() {
 }
 
 func (m *CommsManager) startBroadcasting() {
-	defer m.wg.Done()
+	defer func() {
+		m.wg.Done()
+		log.Println("[Close] Broadcasting goroutine done!")
+	}()
 
 	for {
 		select {
@@ -109,11 +133,14 @@ func (m *CommsManager) startBroadcasting() {
 }
 
 func (m *CommsManager) startRespondingToBroadcasts() {
-	defer m.wg.Done()
+	defer func() {
+		m.wg.Done()
+		log.Println("[Close] Broadcaster responder goroutine done!")
+	}()
 
 	var (
 		buff = make([]byte, 128)
-		myIp = m.broadcaster.LocalAddr().IP
+		myIP = m.broadcaster.LocalAddr().IP
 	)
 
 	for {
@@ -123,12 +150,11 @@ func (m *CommsManager) startRespondingToBroadcasts() {
 		default:
 			n, addr, err := m.broadcaster.Read(buff)
 			if err != nil {
-				log.Printf("Error reading broadcast: %v", err)
 				continue
 			}
 
 			// Ignore our own broadcast messages
-			if myIp.Equal(addr.IP) {
+			if myIP.Equal(addr.IP) {
 				continue
 			}
 
@@ -136,14 +162,20 @@ func (m *CommsManager) startRespondingToBroadcasts() {
 				peerAddr := *addr
 				peerAddr.Port = UnicastPort
 
-				m.unicaster.Write([]byte(responseMessage), &peerAddr)
+				_, err := m.unicaster.Write([]byte(responseMessage), &peerAddr)
+				if err != nil {
+					log.Printf("Couldn't send response to %s: %s\n", peerAddr.IP, err)
+				}
 			}
 		}
 	}
 }
 
 func (m *CommsManager) startListeningToUnicast() {
-	defer m.wg.Done()
+	defer func() {
+		m.wg.Done()
+		log.Println("[Close] Unicaster goroutine done!")
+	}()
 
 	buff := make([]byte, 1024)
 
@@ -154,7 +186,6 @@ func (m *CommsManager) startListeningToUnicast() {
 		default:
 			n, addr, err := m.unicaster.Read(buff)
 			if err != nil {
-				log.Printf("Error reading unicast: %v", err)
 				continue
 			}
 
@@ -218,7 +249,7 @@ func (m *CommsManager) registerPeer(peer Peer) error {
 	return nil
 }
 
-// Stop signals all concurrent processes of the CommsManager to stop.
+// Stop signals all the CommsManager goroutines to stop.
 func (m *CommsManager) Stop() {
 	if !m.isRunning {
 		return
@@ -227,4 +258,12 @@ func (m *CommsManager) Stop() {
 	close(m.done)
 	m.wg.Wait()
 	m.isRunning = false
+}
+
+// Close stops the communications (if they weren't already) and closes the
+// broadcast and unicast connections.
+func (m *CommsManager) Close() {
+	m.Stop()
+	m.broadcaster.Close()
+	m.unicaster.Close()
 }
