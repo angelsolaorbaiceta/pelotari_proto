@@ -109,189 +109,193 @@ func TestCommsManager(t *testing.T) {
 		return broadcaster, responder, closeChans
 	}
 
-	t.Run("Successful handshake", func(t *testing.T) {
-		var (
-			writtenMsgsChan                    = make(chan fakeMsgRecord)
-			broadcaster, responder, closeChans = makeConnectedPeers(writtenMsgsChan)
-			got, want                          fakeMsgRecord
-		)
+	t.Run("The handshake procedure", func(t *testing.T) {
+		t.Run("Successful handshake", func(t *testing.T) {
+			var (
+				writtenMsgsChan                    = make(chan fakeMsgRecord)
+				broadcaster, responder, closeChans = makeConnectedPeers(writtenMsgsChan)
+				got, want                          fakeMsgRecord
+			)
 
-		broadcaster.Start()
-		responder.Start()
-		defer func() {
-			closeChans()
-			close(writtenMsgsChan)
+			broadcaster.Start()
+			responder.Start()
+			defer func() {
+				closeChans()
+				close(writtenMsgsChan)
 
-			broadcaster.Stop()
-			responder.Stop()
-		}()
+				broadcaster.Stop()
+				responder.Stop()
+			}()
 
-		// Wait for the broadcast message to be sent by the broadcaster
-		// BROADCASTER --> EVERYONE
-		got = <-writtenMsgsChan
-		want = fakeMsgRecord{
-			IsUnicast: false,
-			From:      &broadcasterBroadAddr,
-			To: &net.UDPAddr{
-				IP:   []byte(fakeBroadcastAddr),
-				Port: BroadcastPort,
-			},
-			Payload: []byte(discoveryMessage),
-		}
-		assert.Equal(t, want, got)
-
-		// Wait for the response message to be sent by the responder
-		// RESPONDER --> BROADCASTER
-		got = <-writtenMsgsChan
-		want = fakeMsgRecord{
-			IsUnicast: true,
-			From:      &responderUniAddr,
-			To: &net.UDPAddr{
-				IP:   []byte(broadcasterIP),
-				Port: UnicastPort,
-			},
-			Payload: []byte(responseMessage),
-		}
-		assert.Equal(t, want, got)
-
-		// Wait for the confirmatio message to be sent by the broadcaster
-		// BROADCASTER --> RESPONDER
-		got = <-writtenMsgsChan
-		want = fakeMsgRecord{
-			IsUnicast: true,
-			From:      &broadcasterUniAddr,
-			To: &net.UDPAddr{
-				IP:   []byte(responderIP),
-				Port: UnicastPort,
-			},
-			Payload: []byte(confirmationMessage),
-		}
-		assert.Equal(t, want, got)
-
-		// Check that the peer is correctly registered in the broadcaster
-		wantPeer := Peer{
-			IP: []byte(responderIP),
-		}
-		broadcasterPeers := <-broadcaster.PeersCh()
-		gotPeer := broadcasterPeers[0]
-		assert.True(t, wantPeer.Equal(gotPeer))
-
-		// Check that the responder registered the broadcaster
-		wantPeer = Peer{
-			IP: []byte(broadcasterIP),
-		}
-		responderPeers := <-responder.PeersCh()
-		gotPeer = responderPeers[0]
-		assert.True(t, wantPeer.Equal(gotPeer))
-	})
-
-	t.Run("Broadcaster ignores its own messages", func(t *testing.T) {
-		// The broadcaster writes to and reads from the same channel.
-		// The broadcaster should ignore its own message and not respond to it.
-		// There should be no unicast response from it.
-		var (
-			writtenMsgsChan = make(chan fakeMsgRecord)
-			broadCh         = make(chan fakeMsgRecord, 1)
-			broadConn       = fakeBroadcastConn{
-				writeChan: broadCh,
-				readChan:  broadCh,
-				written:   writtenMsgsChan,
-				localAddr: &broadcasterBroadAddr,
+			// Wait for the broadcast message to be sent by the broadcaster
+			// BROADCASTER --> EVERYONE
+			got = <-writtenMsgsChan
+			want = fakeMsgRecord{
+				IsUnicast: false,
+				From:      &broadcasterBroadAddr,
+				To: &net.UDPAddr{
+					IP:   []byte(fakeBroadcastAddr),
+					Port: BroadcastPort,
+				},
+				Payload: []byte(discoveryMessage),
 			}
-			unicConn = fakeUnicastConn{
-				writeChan: nil,
-				readChan:  nil,
-				written:   writtenMsgsChan,
-				localAddr: &broadcasterUniAddr,
+			assert.Equal(t, want, got)
+
+			// Wait for the response message to be sent by the responder
+			// RESPONDER --> BROADCASTER
+			got = <-writtenMsgsChan
+			want = fakeMsgRecord{
+				IsUnicast: true,
+				From:      &responderUniAddr,
+				To: &net.UDPAddr{
+					IP:   []byte(broadcasterIP),
+					Port: UnicastPort,
+				},
+				Payload: []byte(responseMessage),
 			}
-			broadcaster = MakeManager(&broadConn, &unicConn, makeTestingConfig())
+			assert.Equal(t, want, got)
 
-			want, got fakeMsgRecord
-		)
+			// Wait for the confirmatio message to be sent by the broadcaster
+			// BROADCASTER --> RESPONDER
+			got = <-writtenMsgsChan
+			want = fakeMsgRecord{
+				IsUnicast: true,
+				From:      &broadcasterUniAddr,
+				To: &net.UDPAddr{
+					IP:   []byte(responderIP),
+					Port: UnicastPort,
+				},
+				Payload: []byte(confirmationMessage),
+			}
+			assert.Equal(t, want, got)
 
-		broadcaster.Start()
-		defer func() {
-			close(broadCh)
-			close(writtenMsgsChan)
-			broadcaster.Stop()
-		}()
+			// Check that the peer is correctly registered in the broadcaster
+			wantPeer := Peer{
+				IP: []byte(responderIP),
+			}
+			broadcasterPeers := <-broadcaster.PeersCh()
+			gotPeer := broadcasterPeers[0]
+			assert.True(t, wantPeer.Equal(gotPeer))
 
-		// Wait for the broadcast message to be sent by the broadcaster
-		got = <-writtenMsgsChan
-		want = fakeMsgRecord{
-			IsUnicast: false,
-			From:      &broadcasterBroadAddr,
-			To: &net.UDPAddr{
-				IP:   []byte(fakeBroadcastAddr),
-				Port: BroadcastPort,
-			},
-			Payload: []byte(discoveryMessage),
-		}
-		assert.Equal(t, want, got)
+			// Check that the responder registered the broadcaster
+			wantPeer = Peer{
+				IP: []byte(broadcasterIP),
+			}
+			responderPeers := <-responder.PeersCh()
+			gotPeer = responderPeers[0]
+			assert.True(t, wantPeer.Equal(gotPeer))
+		})
 
-		// Make sure that no other message is sent
-		select {
-		case msg := <-writtenMsgsChan:
-			assert.FailNow(t, "A message was sent", string(msg.Payload))
-		case <-time.After(100 * time.Millisecond):
-			// Test passes. No message received in the timeout.
-		}
+		t.Run("Broadcaster ignores its own messages", func(t *testing.T) {
+			// The broadcaster writes to and reads from the same channel.
+			// The broadcaster should ignore its own message and not respond to it.
+			// There should be no unicast response from it.
+			var (
+				writtenMsgsChan = make(chan fakeMsgRecord)
+				broadCh         = make(chan fakeMsgRecord, 1)
+				broadConn       = fakeBroadcastConn{
+					writeChan: broadCh,
+					readChan:  broadCh,
+					written:   writtenMsgsChan,
+					localAddr: &broadcasterBroadAddr,
+				}
+				unicConn = fakeUnicastConn{
+					writeChan: nil,
+					readChan:  nil,
+					written:   writtenMsgsChan,
+					localAddr: &broadcasterUniAddr,
+				}
+				broadcaster = MakeManager(&broadConn, &unicConn, makeTestingConfig())
+
+				want, got fakeMsgRecord
+			)
+
+			broadcaster.Start()
+			defer func() {
+				close(broadCh)
+				close(writtenMsgsChan)
+				broadcaster.Stop()
+			}()
+
+			// Wait for the broadcast message to be sent by the broadcaster
+			got = <-writtenMsgsChan
+			want = fakeMsgRecord{
+				IsUnicast: false,
+				From:      &broadcasterBroadAddr,
+				To: &net.UDPAddr{
+					IP:   []byte(fakeBroadcastAddr),
+					Port: BroadcastPort,
+				},
+				Payload: []byte(discoveryMessage),
+			}
+			assert.Equal(t, want, got)
+
+			// Make sure that no other message is sent
+			select {
+			case msg := <-writtenMsgsChan:
+				assert.FailNow(t, "A message was sent", string(msg.Payload))
+			case <-time.After(100 * time.Millisecond):
+				// Test passes. No message received in the timeout.
+			}
+		})
+
+		t.Run("Broadcaster with max peers registered doesn't send broadcast messages", func(t *testing.T) {
+			var (
+				writtenMsgsChan = make(chan fakeMsgRecord)
+				broadCh         = make(chan fakeMsgRecord, 1)
+				broadcaster, _  = makePeers(writtenMsgsChan, broadCh, nil, nil)
+				peer            = MakePeer([]byte(responderIP))
+			)
+
+			broadcaster.registerPeer(peer)
+
+			broadcaster.Start()
+			defer func() {
+				close(broadCh)
+				close(writtenMsgsChan)
+				broadcaster.Stop()
+			}()
+
+			// Make sure that no discovery message is sent
+			select {
+			case msg := <-writtenMsgsChan:
+				assert.FailNow(t, "A message was sent", string(msg.Payload))
+			case <-time.After(100 * time.Millisecond):
+				// Test passes. No message received in the timeout.
+			}
+		})
+
+		t.Run("Broadcasts from a broadcaster that's already registered aren't answered", func(t *testing.T) {
+			var (
+				writtenMsgsChan                    = make(chan fakeMsgRecord)
+				broadcaster, responder, closeChans = makeConnectedPeers(writtenMsgsChan)
+				peer                               = MakePeer([]byte(broadcasterIP))
+			)
+
+			responder.registerPeer(peer)
+
+			broadcaster.Start()
+			responder.Start()
+			defer func() {
+				closeChans()
+				close(writtenMsgsChan)
+				broadcaster.Stop()
+				responder.Stop()
+			}()
+
+			// Wait for the discovery message to be sent
+			discoveryMsg := <-writtenMsgsChan
+			assert.False(t, discoveryMsg.IsUnicast)
+
+			// Make sure that the responder doesn't respond to the broadcast
+			select {
+			case msg := <-writtenMsgsChan:
+				assert.FailNow(t, "A message was sent", string(msg.Payload))
+			case <-time.After(100 * time.Millisecond):
+				// Test passes. No message received in the timeout.
+			}
+		})
 	})
 
-	t.Run("Broadcaster with max peers registered doesn't send broadcast messages", func(t *testing.T) {
-		var (
-			writtenMsgsChan = make(chan fakeMsgRecord)
-			broadCh         = make(chan fakeMsgRecord, 1)
-			broadcaster, _  = makePeers(writtenMsgsChan, broadCh, nil, nil)
-			peer            = MakePeer([]byte(responderIP))
-		)
-
-		broadcaster.registerPeer(peer)
-
-		broadcaster.Start()
-		defer func() {
-			close(broadCh)
-			close(writtenMsgsChan)
-			broadcaster.Stop()
-		}()
-
-		// Make sure that no discovery message is sent
-		select {
-		case msg := <-writtenMsgsChan:
-			assert.FailNow(t, "A message was sent", string(msg.Payload))
-		case <-time.After(100 * time.Millisecond):
-			// Test passes. No message received in the timeout.
-		}
-	})
-
-	t.Run("Broadcasts from a broadcaster that's already registered aren't answered", func(t *testing.T) {
-		var (
-			writtenMsgsChan                    = make(chan fakeMsgRecord)
-			broadcaster, responder, closeChans = makeConnectedPeers(writtenMsgsChan)
-			peer                               = MakePeer([]byte(broadcasterIP))
-		)
-
-		responder.registerPeer(peer)
-
-		broadcaster.Start()
-		responder.Start()
-		defer func() {
-			closeChans()
-			close(writtenMsgsChan)
-			broadcaster.Stop()
-			responder.Stop()
-		}()
-
-		// Wait for the discovery message to be sent
-		discoveryMsg := <-writtenMsgsChan
-		assert.False(t, discoveryMsg.IsUnicast)
-
-		// Make sure that the responder doesn't respond to the broadcast
-		select {
-		case msg := <-writtenMsgsChan:
-			assert.FailNow(t, "A message was sent", string(msg.Payload))
-		case <-time.After(100 * time.Millisecond):
-			// Test passes. No message received in the timeout.
-		}
-	})
+	t.Run("The heartbeat procedure", func(t *testing.T) {})
 }
