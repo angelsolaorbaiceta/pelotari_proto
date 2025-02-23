@@ -143,9 +143,9 @@ func (conn UDPUnicastConn) LocalAddr() *net.UDPAddr {
 }
 
 func (conn UDPUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
-	sendConn, err := net.DialUDP("upd", nil, to)
+	sendConn, err := net.DialUDP("udp", nil, to)
 	if err != nil {
-		return 0, nil
+		return 0, err
 	}
 
 	return sendConn.Write(b)

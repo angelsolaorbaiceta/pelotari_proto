@@ -162,7 +162,10 @@ func (m *CommsManager) startRespondingToBroadcasts() {
 				peerAddr := *addr
 				peerAddr.Port = UnicastPort
 
-				m.unicaster.Write([]byte(responseMessage), &peerAddr)
+				_, err := m.unicaster.Write([]byte(responseMessage), &peerAddr)
+				if err != nil {
+					log.Printf("Couldn't send response to %s: %s\n", peerAddr.IP, err)
+				}
 			}
 		}
 	}
