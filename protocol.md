@@ -102,6 +102,7 @@ The heartbeat works as follows:
    Heartbeat messages are unicast UDP messages containing the string `hor?` (there?).
 3. The broadcaster waits for a maximum amount of configurable time (heartbeat max wait time).
 4. If the peer answers with a `hemen nago!` message (I'm here), the "last seen" timestamp is updated, the missed heartbeats counter reset to zero, and the remaining steps skipped.
+   The peer, apart from answering, it can update the "last seen" timestamp of the peer that sent the hearbeat message.
 5. If the broadcaster doesn't receive response during the allowed time window, its missed heartbeats counter is incremented.
 6. If the missed heartbeats reaches 3, the peer is removed from the registered peers.
 
