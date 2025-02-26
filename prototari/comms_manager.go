@@ -249,6 +249,32 @@ func (m *CommsManager) registerPeer(peer Peer) error {
 	return nil
 }
 
+func (m *CommsManager) sendHeartbeats() {
+	now := time.Now()
+	hasntBeenHeardOf := func(peer Peer) bool {
+		return now.Sub(peer.LastSeen) > m.config.InactivePeerTime
+	}
+
+	m.sendMsgToPeers([]byte(heartbeatMessage), hasntBeenHeardOf)
+}
+
+// sendMsgToPeers sends a given message to all the registered peers for whom the
+// predicate function returns true.
+func (m *CommsManager) sendMsgToPeers(msg []byte, peerPredicate func(Peer) bool) {
+	m.peersMutex.RLock()
+	defer m.peersMutex.RUnlock()
+
+	for _, peer := range m.peers {
+		if peerPredicate(peer) {
+			_, err := m.unicaster.Write(msg, peer.Address())
+			if err != nil {
+				// TODO: handle error
+			}
+		}
+	}
+
+}
+
 // Stop signals all the CommsManager goroutines to stop.
 func (m *CommsManager) Stop() {
 	if !m.isRunning {

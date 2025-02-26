@@ -151,5 +151,5 @@ Messages from unknown peers are ignored.
 
 - **Max. peers**--The maximum number of peers the protocol will attempt to register (defaults to `64`).
 - **Broadcast interval**--The amount of time to wait between broadcast messages (defaults to 5 seconds).
-- **Inactive peer time**--The amount of time after which, if a peer hasn't sent any message, a heartbeat is sent.
+- **Inactive peer time**--The amount of time after which, if a peer hasn't sent any message, a heartbeat is sent (defaults to `30` seconds).
 - **Heartbeat max. wait time**--The maximum amount of time the broadcaster waits for the heartbeat response (defaults to 1 second).

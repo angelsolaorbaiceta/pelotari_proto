@@ -18,6 +18,7 @@ func TestCommsManager(t *testing.T) {
 	var (
 		broadcasterIP        = "192.168.0.10"
 		responderIP          = "192.168.0.20"
+		responderTwoIP       = "192.168.0.21"
 		broadcasterBroadAddr = net.UDPAddr{
 			IP:   []byte(broadcasterIP),
 			Port: 45678,
@@ -297,5 +298,48 @@ func TestCommsManager(t *testing.T) {
 		})
 	})
 
-	t.Run("The heartbeat procedure", func(t *testing.T) {})
+	t.Run("The heartbeat procedure", func(t *testing.T) {
+		t.Run("Pings peers from whom it has't heard of in a while", func(t *testing.T) {
+			var (
+				writtenMsgsChan            = make(chan fakeMsgRecord)
+				broadcaster, _, closeChans = makeConnectedPeers(writtenMsgsChan)
+				peerOne                    = MakePeer([]byte(responderIP))
+				peerTwo                    = MakePeer([]byte(responderTwoIP))
+			)
+
+			defer func() {
+				closeChans()
+				close(writtenMsgsChan)
+			}()
+
+			// Peer one was last seen long ago
+			peerOne.LastSeen = peerOne.LastSeen.Add(-broadcaster.config.InactivePeerTime)
+			broadcaster.registerPeer(peerOne)
+			broadcaster.registerPeer(peerTwo)
+
+			go broadcaster.sendHeartbeats()
+
+			// Only a message to peer one should have been sent.
+			got := <-writtenMsgsChan
+			want := fakeMsgRecord{
+				IsUnicast: true,
+				From:      &broadcasterUniAddr,
+				To: &net.UDPAddr{
+					IP:   []byte(peerOne.IP),
+					Port: UnicastPort,
+				},
+				Payload: []byte(heartbeatMessage),
+			}
+			assert.Equal(t, want, got)
+
+			// Make sure no other message is sent
+			select {
+			case msg := <-writtenMsgsChan:
+				assert.FailNow(t, "A message was sent", string(msg.Payload))
+			case <-time.After(100 * time.Millisecond):
+				// Test passes. No message received in the timeout.
+			}
+		})
+
+	})
 }
