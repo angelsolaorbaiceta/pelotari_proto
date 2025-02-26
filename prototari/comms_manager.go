@@ -249,30 +249,39 @@ func (m *CommsManager) registerPeer(peer Peer) error {
 	return nil
 }
 
-func (m *CommsManager) sendHeartbeats() {
+// sendHeartbeats sends a heartbeat message to all registered peers from whom
+// it hasn't heard of in the configured interval of time (peer inactive time).
+func (m *CommsManager) sendHeartbeats() error {
 	now := time.Now()
 	hasntBeenHeardOf := func(peer Peer) bool {
 		return now.Sub(peer.LastSeen) > m.config.InactivePeerTime
 	}
 
-	m.sendMsgToPeers([]byte(heartbeatMessage), hasntBeenHeardOf)
+	return m.sendMsgToPeers([]byte(heartbeatMessage), hasntBeenHeardOf)
 }
 
 // sendMsgToPeers sends a given message to all the registered peers for whom the
 // predicate function returns true.
-func (m *CommsManager) sendMsgToPeers(msg []byte, peerPredicate func(Peer) bool) {
+// Returns an error that groups the errors of all internal calls.
+func (m *CommsManager) sendMsgToPeers(
+	msg []byte,
+	peerPredicate func(Peer) bool,
+) error {
 	m.peersMutex.RLock()
 	defer m.peersMutex.RUnlock()
+
+	var errs []error
 
 	for _, peer := range m.peers {
 		if peerPredicate(peer) {
 			_, err := m.unicaster.Write(msg, peer.Address())
 			if err != nil {
-				// TODO: handle error
+				errs = append(errs, err)
 			}
 		}
 	}
 
+	return errors.Join(errs...)
 }
 
 // Stop signals all the CommsManager goroutines to stop.
