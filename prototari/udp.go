@@ -45,13 +45,11 @@ func (c *UDPBroadcastConn) Connect() {
 	}
 	c.broadcastAddr = broadcastAddr
 
-	sendConn, err := net.DialUDP("udp", nil, c.broadcastAddr)
+	udpConn, err := net.ListenUDP("udp", broadcastAddr)
 	if err != nil {
-		// Not much we can do here.
-		// If a UDP address can't be dialed, the protocol can't work.
 		log.Fatal(err)
 	}
-	c.conn = sendConn
+	c.conn = udpConn
 
 	c.isConnected = true
 }
@@ -108,11 +106,11 @@ func (c *UDPUnicastConn) Connect() {
 		Port: UnicastPort,
 	}
 
-	readAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", UnicastPort))
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", UnicastPort))
 	if err != nil {
 		log.Fatal(err)
 	}
-	udpConn, err := net.ListenUDP("udp", readAddr)
+	udpConn, err := net.ListenUDP("udp", addr)
 	if err != nil {
 		// Not much we can do here.
 		// If a UDP address can't be dialed, the protocol can't work.
