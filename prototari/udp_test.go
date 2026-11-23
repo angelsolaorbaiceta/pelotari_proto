@@ -3,6 +3,7 @@ package prototari
 import (
 	"errors"
 	"net"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -11,21 +12,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// These tests exercise UDPUnicastConn against real kernel sockets on the
-// loopback interface. The CommsManager tests use in-memory fakes, so they can't
-// catch bugs in how the real connection talks to the network (e.g. writing on an
-// unconnected socket without a destination address, which fails with
-// EDESTADDRREQ, or sending from an ephemeral port instead of UnicastPort).
+// These tests exercise UDPUnicastConn and UDPBroadcastConn against real kernel
+// sockets on the loopback interface. The CommsManager tests use in-memory fakes,
+// so they can't catch bugs in how the real connections talk to the network (e.g.
+// writing on an unconnected socket without a destination address, which fails
+// with EDESTADDRREQ, or sending from an ephemeral port instead of the protocol
+// port).
 //
-// UDPUnicastConn.Connect() discovers the machine's private IP, which isn't
-// available everywhere (CI runners, containers). The socket is listened on
-// directly here instead, mirroring what Connect() does.
+// Connect() discovers the machine's private IP, which isn't available
+// everywhere (CI runners, containers). The sockets are opened directly here
+// instead, mirroring what Connect() is expected to do: listen on the protocol
+// port and send from that same socket. As a consequence, these tests don't
+// cover Connect() itself.
 
 // ioTimeout bounds every blocking read so a broken implementation makes the test
 // fail quickly instead of hanging until the global test timeout.
 const ioTimeout = 1 * time.Second
 
-var loopbackIP = net.IPv4(127, 0, 0, 1)
+var (
+	loopbackIP = net.IPv4(127, 0, 0, 1)
+
+	// loopbackBroadcastIP is the broadcast address of 127.0.0.0/8. The lo
+	// interface has no IFF_BROADCAST flag, but Linux installs a broadcast route
+	// for it in the local routing table (see `ip route show table local`), so
+	// datagrams sent here are delivered to every socket bound to the port.
+	loopbackBroadcastIP = net.IPv4(127, 255, 255, 255)
+)
 
 // newLoopbackUnicastConn returns a UDPUnicastConn listening on UnicastPort, the
 // same way Connect() sets it up, but without relying on a private IP being
@@ -44,6 +56,35 @@ func newLoopbackUnicastConn(t *testing.T) *UDPUnicastConn {
 		localAddr:   &net.UDPAddr{IP: loopbackIP, Port: UnicastPort},
 		isConnected: true,
 		conn:        udpConn,
+	}
+	t.Cleanup(conn.Close)
+
+	return conn
+}
+
+// newLoopbackBroadcastConn returns a UDPBroadcastConn listening on
+// BroadcastPort and broadcasting to the loopback broadcast address. The
+// connection is closed when the test ends.
+func newLoopbackBroadcastConn(t *testing.T) *UDPBroadcastConn {
+	t.Helper()
+
+	if runtime.GOOS != "linux" {
+		// Other systems don't necessarily route 127.255.255.255 as a broadcast.
+		t.Skipf("loopback broadcast isn't supported on %s", runtime.GOOS)
+	}
+
+	udpConn, err := net.ListenUDP("udp", &net.UDPAddr{Port: BroadcastPort})
+	if errors.Is(err, syscall.EADDRINUSE) {
+		// Most likely a Pelotari instance is running on this machine.
+		t.Skipf("port %d already in use, skipping: %v", BroadcastPort, err)
+	}
+	require.NoError(t, err)
+
+	conn := &UDPBroadcastConn{
+		localAddr:     &net.UDPAddr{IP: loopbackIP, Port: BroadcastPort},
+		broadcastAddr: &net.UDPAddr{IP: loopbackBroadcastIP, Port: BroadcastPort},
+		isConnected:   true,
+		conn:          udpConn,
 	}
 	t.Cleanup(conn.Close)
 
@@ -131,5 +172,52 @@ func TestUDPUnicastConn(t *testing.T) {
 			require.NoError(t, err, "datagram #%d never arrived", i)
 			require.Equal(t, UnicastPort, from.Port, "datagram #%d sent from another socket", i)
 		}
+	})
+}
+
+func TestUDPBroadcastConn(t *testing.T) {
+	t.Run("Write broadcasts from BroadcastPort and the broadcast is received", func(t *testing.T) {
+		var (
+			conn    = newLoopbackBroadcastConn(t)
+			payload = []byte(discoveryMessage)
+		)
+
+		n, err := conn.Write(payload)
+		require.NoError(t, err)
+		assert.Equal(t, len(payload), n)
+
+		// The broadcast is delivered to every socket bound to BroadcastPort,
+		// including the sender's own. That's why the CommsManager filters out
+		// broadcasts coming from its own IP.
+		buff := make([]byte, 64)
+		n, from, err := conn.Read(buff)
+		require.NoError(t, err, "the broadcast was never received on BroadcastPort")
+
+		assert.Equal(t, payload, buff[:n])
+		assert.True(t, loopbackIP.Equal(from.IP), "want sender IP %s, got %s", loopbackIP, from.IP)
+		assert.Equal(t, BroadcastPort, from.Port, "broadcast wasn't sent from BroadcastPort")
+	})
+
+	t.Run("Read receives broadcasts sent by other hosts", func(t *testing.T) {
+		var (
+			conn     = newLoopbackBroadcastConn(t)
+			peer     = newLoopbackPeer(t)
+			peerAddr = peer.LocalAddr().(*net.UDPAddr)
+			payload  = []byte(discoveryMessage)
+		)
+
+		_, err := peer.WriteToUDP(
+			payload,
+			&net.UDPAddr{IP: loopbackBroadcastIP, Port: BroadcastPort},
+		)
+		require.NoError(t, err)
+
+		buff := make([]byte, 64)
+		n, from, err := conn.Read(buff)
+		require.NoError(t, err, "the broadcast was never received on BroadcastPort")
+
+		assert.Equal(t, payload, buff[:n])
+		assert.True(t, peerAddr.IP.Equal(from.IP), "want sender IP %s, got %s", peerAddr.IP, from.IP)
+		assert.Equal(t, peerAddr.Port, from.Port)
 	})
 }
