@@ -106,8 +106,8 @@ type UDPUnicastConn struct {
 	conn        *net.UDPConn
 }
 
-func (conn *UDPUnicastConn) Connect() {
-	if conn.isConnected {
+func (c *UDPUnicastConn) Connect() {
+	if c.isConnected {
 		return
 	}
 
@@ -118,7 +118,7 @@ func (conn *UDPUnicastConn) Connect() {
 		log.Fatal(err)
 	}
 
-	conn.localAddr = &net.UDPAddr{
+	c.localAddr = &net.UDPAddr{
 		IP:   privIP,
 		Port: UnicastPort,
 	}
@@ -133,33 +133,33 @@ func (conn *UDPUnicastConn) Connect() {
 		// If a UDP address can't be dialed, the protocol can't work.
 		panic(err)
 	}
-	conn.conn = udpConn
+	c.conn = udpConn
 
-	conn.isConnected = true
+	c.isConnected = true
 }
 
-func (conn UDPUnicastConn) LocalAddr() *net.UDPAddr {
-	return conn.localAddr
+func (c UDPUnicastConn) LocalAddr() *net.UDPAddr {
+	return c.localAddr
 }
 
-func (conn UDPUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
-	return conn.conn.WriteToUDP(b, to)
+func (c UDPUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
+	return c.conn.WriteToUDP(b, to)
 }
 
-func (conn UDPUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
-	conn.conn.SetReadDeadline(time.Now().Add(connReadTimeout))
-	return conn.conn.ReadFromUDP(b)
+func (c UDPUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
+	c.conn.SetReadDeadline(time.Now().Add(connReadTimeout))
+	return c.conn.ReadFromUDP(b)
 }
 
-func (conn *UDPUnicastConn) Close() {
-	if !conn.isConnected {
+func (c *UDPUnicastConn) Close() {
+	if !c.isConnected {
 		return
 	}
 
-	conn.conn.Close()
+	c.conn.Close()
 
-	conn.conn = nil
-	conn.localAddr = nil
+	c.conn = nil
+	c.localAddr = nil
 
-	conn.isConnected = false
+	c.isConnected = false
 }
