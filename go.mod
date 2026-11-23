@@ -1,6 +1,6 @@
 module github.com/angelsolaorbaiceta/prototari
 
-go 1.23.4
+go 1.27.4
 
 require github.com/stretchr/testify v1.10.0
 
