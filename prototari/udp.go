@@ -59,7 +59,7 @@ func (c UDPBroadcastConn) LocalAddr() *net.UDPAddr {
 }
 
 func (c UDPBroadcastConn) Write(b []byte) (int, error) {
-	return c.conn.Write(b)
+	return c.conn.WriteToUDP(b, c.broadcastAddr)
 }
 
 func (c UDPBroadcastConn) Read(b []byte) (int, *net.UDPAddr, error) {
