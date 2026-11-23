@@ -143,7 +143,7 @@ func (conn UDPUnicastConn) LocalAddr() *net.UDPAddr {
 }
 
 func (conn UDPUnicastConn) Write(b []byte, to *net.UDPAddr) (int, error) {
-	return conn.conn.Write(b)
+	return conn.conn.WriteToUDP(b, to)
 }
 
 func (conn UDPUnicastConn) Read(b []byte) (int, *net.UDPAddr, error) {
